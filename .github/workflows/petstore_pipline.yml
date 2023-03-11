@@ -1,0 +1,56 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Logs in Azure
+      - name: Login to container registry
+        uses: docker/login-action@v2
+        with:
+         registry: judevopsexam.azurecr.io
+         username: ${{ secrets.USERNAME }}
+         password: ${{ secrets.PASSWORD }} 
+
+      # Runs Pytests
+      - name: Run tests
+        run: |
+           pip3 install -r petstore/requirements.txt    
+           docker run -d -e SWAGGER_HOST=http://petstore.swagger.io -e SWAGGER_URL=http://localhost -e SWAGGER_BASE_PATH=/v2 -p 80:8080 swaggerapi/petstore 
+           sleep 10 
+           pytest --junit-xml=report.xml
+
+      #Creates test report 
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v3
+        if: always() 
+        with:
+          report_paths: '**/*.xml'      
+
+      - name: Push
+        if: ${{success()}}
+        run: |
+           docker tag swaggerapi/petstore judevopsexam.azurecr.io/sandra_nissan-petstore 
+           docker push judevopsexam.azurecr.io/sandra_nissan-petstore
+        
